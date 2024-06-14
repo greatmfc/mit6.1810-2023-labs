@@ -1,3 +1,8 @@
+#ifndef SLEEPLOCK_H
+#define SLEEPLOCK_H
+
+#include "kernel/spinlock.h"
+#include "types.h"
 // Long-term locks for processes
 struct sleeplock {
   uint locked;       // Is the lock held?
@@ -8,3 +13,5 @@ struct sleeplock {
   int pid;           // Process holding lock
 };
 
+
+#endif
