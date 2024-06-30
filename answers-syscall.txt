@@ -1,0 +1,10 @@
+1. usertrap() at kernel/trap.c called syscall.
+2. The value of p->trapframe->a7 is 7 and represents SYS_exec in syscall.h.
+3. The previous mode that the CPU was in is supervisor mode.
+4. 
+    800020b6:	00002683          	lw	a3,0(zero) # 0 <_entry-0x80000000>
+    Register corresponds to num is a3.
+5. Address 0 is not mapped in the kernel address space.
+   The register scause value is 0x000000000000000d which refers to the exception code 13 listed in Table 4.2, page 71 in riscv-privileged-20211203.pdf.
+6. The name of the binary that was running when the kernel paniced is [initcode]. The pid is 1.
+
