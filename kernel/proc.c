@@ -688,3 +688,13 @@ procdump(void)
     printf("\n");
   }
 }
+
+uint32 working_process_amount(void){
+  int num=0;
+  for(int i=0;i<NPROC;++i){
+    if(proc[i].state!=UNUSED){
+      ++num;
+    }
+  }
+  return num;
+}
