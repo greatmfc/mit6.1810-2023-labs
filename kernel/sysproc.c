@@ -91,3 +91,13 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64
+sys_trace(void){
+  int arg=0;
+
+  argint(0, &arg);
+  //Save mask in t6
+  myproc()->trapframe->t6=arg;
+  return 0;
+}
