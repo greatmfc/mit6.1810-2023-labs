@@ -1,3 +1,6 @@
+#ifndef SYSCALL_H
+#define SYSCALL_H
+
 // System call numbers
 #define SYS_fork    1
 #define SYS_exit    2
@@ -31,3 +34,5 @@
 #define SYS_munmap    28
 #define SYS_connect   29
 #define SYS_pgaccess  30
+
+#endif

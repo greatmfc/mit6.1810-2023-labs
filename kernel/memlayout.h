@@ -1,3 +1,6 @@
+#ifndef MEMLAYOUT_H
+#define MEMLAYOUT_H
+
 // Physical memory layout
 
 // qemu -machine virt is set up like this,
@@ -76,4 +79,6 @@
 struct usyscall {
   int pid;  // Process ID
 };
+#endif
+
 #endif
