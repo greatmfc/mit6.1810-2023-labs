@@ -1,0 +1,4 @@
+1. All syscalls that require exchange infos with kernel can be made faster using this shared page. 
+   Because the kernel can access the specified info through the shared page instead copy from user space to kernel and do the same opposite.
+
+2. It contains the content of trampoline and trapframe and others. The permissions are PTE_R, PTE_W or PTE_X.
