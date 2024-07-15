@@ -1,0 +1,13 @@
+1. The registers that contain arguments to functions are a0–a7 and fa0-fay, which is specified in page 2, 18.2, riscv-calling.pdf.
+   The register a2 holds 13 in main's call to printf.
+
+2. In line 46, address 26, the function f was called and inlined. The call to g is in line 32, address 14 which is also inlined.
+
+3. The function printf is located at address 630.
+
+4. The value in the register ra just after the jalr to printf in main is 38(the address just after the instruction). Because the address of the instruction following the jump
+(pc+4) is written to register ra when the jalr instruction is executed. (Page 39 and 140, riscv-spec-20191213.pdf)
+
+5. The output is "He110 World". i should be set to 0x726c6400 if it is big-endian. Don't need to change 57616 because it is in fact outputting the hexadecimal representation of the value which is not effected by the sequence of bytes stored in a computer’s memory.
+
+6. A random number is printed after 'y='. Because the caller didn't provide enough argument for printf. It has to locate the subsequent memory address for its second argument, which is an undefined behavior in c++.
