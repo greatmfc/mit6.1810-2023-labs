@@ -146,6 +146,16 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  // Initialize variables for sigalarm
+  p->ticks = -1;
+  p->ticks_passed = -1;
+  p->alarm_handler_addr = -1;
+  p->ret_addr = -1;
+  if ((p->backup_frame = (struct trapframe *)kalloc()) == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
   return p;
 }
 
@@ -157,6 +167,8 @@ freeproc(struct proc *p)
 {
   if(p->trapframe)
     kfree((void*)p->trapframe);
+  if (p->backup_frame)
+    kfree((void *)p->backup_frame);
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);

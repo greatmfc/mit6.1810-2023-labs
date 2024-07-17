@@ -6,6 +6,8 @@
 #include "proc.h"
 #include "defs.h"
 
+#define COPYOFFSET 40
+
 struct spinlock tickslock;
 uint ticks;
 
@@ -65,11 +67,24 @@ usertrap(void)
     intr_on();
 
     syscall();
+
+    if (p->ticks_passed == -2) {
+      // handler has returned, set pc to previous interrupted address
+      p->trapframe->epc = p->ret_addr;
+      p->ret_addr = -1;
+      // restore trapframe
+      memmove((void *)(p->trapframe) + COPYOFFSET,
+              (void *)(p->backup_frame) + COPYOFFSET,
+              sizeof(struct trapframe) - COPYOFFSET);
+      memset(p->backup_frame, 0, sizeof(struct trapframe));
+      p->ticks_passed = 0;
+    }
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+    backtrace();
     setkilled(p);
   }
 
@@ -77,8 +92,23 @@ usertrap(void)
     exit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if (which_dev == 2) {
+    if (p->ticks_passed > -1) {
+      ++p->ticks_passed;
+      if (p->ticks_passed >= p->ticks) {
+          p->ret_addr = p->trapframe->epc;
+          // start to execute handler
+          p->trapframe->epc = p->alarm_handler_addr;
+          // alarm will not be handle until sigreturn() is called.
+          p->ticks_passed = -1;
+          // save trapframe
+          memmove((void *)(p->backup_frame) + COPYOFFSET,
+                  (void *)(p->trapframe) + COPYOFFSET,
+                  sizeof(struct trapframe) - COPYOFFSET);
+      }
+    }
     yield();
+  }
 
   usertrapret();
 }
