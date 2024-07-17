@@ -23,3 +23,8 @@ ph
 barrier
 /lab-*.json
 .DS_Store
+.*
+.*/
+./
+add_marco.py
+compile_commands.json
