@@ -67,7 +67,32 @@ usertrap(void)
     syscall();
   } else if((which_dev = devintr()) != 0){
     // ok
-  } else {
+  }
+  else {
+    if (r_scause() == 15) {
+      // Store/AMO page fault
+      uint64 va = r_stval();
+      if (va >= MAXVA) {
+          goto bad;
+      }
+      pte_t *pte = walk(p->pagetable, va, 0);
+      if ((*pte & 0x300) != 0x200) {
+          goto bad;
+      }
+      void *pa = kalloc();
+      if (pa == 0) {
+          printf("Failed to alloc new page in COW. pid:%d\n", p->pid);
+          goto bad;
+      }
+      // 0x304 is 11'0000'0100, set the flags back to normal page
+      uint flags = PTE_FLAGS(*pte) | 0x304;
+      void *origin_pa = (void *)PTE2PA(*pte);
+      memmove(pa, origin_pa, PGSIZE);
+      mappages(p->pagetable, PGROUNDDOWN(va), PGSIZE, (uint64)pa, flags);
+      kfree(origin_pa);
+      goto good;
+    }
+  bad:
     printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
     printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
     setkilled(p);
@@ -75,7 +100,7 @@ usertrap(void)
 
   if(killed(p))
     exit(-1);
-
+good:
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
     yield();

@@ -330,6 +330,12 @@ sfence_vma()
   asm volatile("sfence.vma zero, zero");
 }
 
+static inline uint64 r_fp() {
+  uint64 x;
+  asm volatile("mv %0, s0" : "=r"(x));
+  return x;
+}
+
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t; // 512 PTEs
 
@@ -346,6 +352,7 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE_W (1L << 2)
 #define PTE_X (1L << 3)
 #define PTE_U (1L << 4) // user can access
+#define PTE_S (2L << 8) // shared page
 
 // shift a physical address to the right place for a PTE.
 #define PA2PTE(pa) ((((uint64)pa) >> 12) << 10)
@@ -353,6 +360,8 @@ typedef uint64 *pagetable_t; // 512 PTEs
 #define PTE2PA(pte) (((pte) >> 10) << 12)
 
 #define PTE_FLAGS(pte) ((pte) & 0x3FF)
+
+#define PTE_NOT_S(pte) (((pte)&0x300) ^ 0x200)
 
 // extract the three 9-bit page table indices from a virtual address.
 #define PXMASK          0x1FF // 9 bits
@@ -364,5 +373,7 @@ typedef uint64 *pagetable_t; // 512 PTEs
 // Sv39, to avoid having to sign-extend virtual addresses
 // that have the high bit set.
 #define MAXVA (1L << (9 + 9 + 9 + 12 - 1))
+
+#define REF_IDX(pa) ((((uint64)pa) & 0x7fffffff) / 0x1000)
 
 #endif

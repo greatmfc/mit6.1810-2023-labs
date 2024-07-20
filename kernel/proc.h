@@ -1,5 +1,6 @@
 #ifndef PROC_H
 #define PROC_H
+#include "spinlock.h"
 
 // Saved registers for kernel context switches.
 struct context {
