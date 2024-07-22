@@ -24,3 +24,6 @@ barrier
 /lab-*.json
 .DS_Store
 *.dSYM
+.*
+add_marco.py
+compile_commands.json
