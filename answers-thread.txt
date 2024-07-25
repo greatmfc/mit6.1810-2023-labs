@@ -1,0 +1,5 @@
+1. Because gcc will help generate codes to save and restore the caller-save registers before jumping to a function.
+2. The key sequence that cause the missing is the call to function "insert" in line 55, line 35 to 37,  ph.c.
+    It is a typical racing problem that one thread might change an entry as the front of bucket, 
+    but another thread is trying to set its next entry as the original front entry.
+    The second thread has not been notified the change that first thread had made, so it sets its next entry to a wrong one.
