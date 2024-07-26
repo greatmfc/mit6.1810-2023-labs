@@ -1,3 +1,6 @@
+#ifndef E1000_DEV_H
+#define E1000_DEV_H
+
 //
 // E1000 hardware definitions: registers and DMA ring format.
 // from the Intel 82540EP/EM &c manual.
@@ -123,3 +126,5 @@ struct rx_desc
   uint16 special;
 };
 
+
+#endif
