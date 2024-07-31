@@ -47,7 +47,7 @@ binit(void)
     b->next = bcache.head.next;
     b->prev = &bcache.head;
     initsleeplock(&b->lock, "buffer");
-    bcache.head.next->prev = b;
+    bcache.head.next->prev = b; // Points to last entry of the list
     bcache.head.next = b;
   }
 }
