@@ -1,3 +1,6 @@
+#ifndef PARAM_H
+#define PARAM_H
+
 #ifdef LAB_FS
 #define NPROC        10  // maximum number of processes
 #else
@@ -25,3 +28,5 @@
 #define MAXPATH      128   // maximum file path name
 
 
+
+#endif

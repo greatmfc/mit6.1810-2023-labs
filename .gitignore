@@ -25,3 +25,6 @@ barrier
 .DS_Store
 *.dSYM
 *.pcap
+.*
+add_marco.py
+compile_commands.json
