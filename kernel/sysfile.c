@@ -309,6 +309,7 @@ sys_open(void)
   struct file *f;
   struct inode *ip;
   int n;
+  int recursive_count = 0;
 
   argint(1, &omode);
   if((n = argstr(0, path, MAXPATH)) < 0)
@@ -323,6 +324,7 @@ sys_open(void)
       return -1;
     }
   } else {
+  start:
     if((ip = namei(path)) == 0){
       end_op();
       return -1;
@@ -339,6 +341,24 @@ sys_open(void)
     iunlockput(ip);
     end_op();
     return -1;
+  }
+
+  if (ip->type == T_SYMLINK) {
+    // Go find the target file if NOFOLLOW is not set
+    if (!(omode & O_NOFOLLOW)) {
+      if ((n = readi(ip, 0, (uint64)path, 0, ip->size)) != ip->size) {
+        iunlockput(ip);
+        end_op();
+        return -1;
+      }
+      iunlockput(ip);
+      ++recursive_count;
+      if (recursive_count >= 10) {
+        end_op();
+        return -1;
+      }
+      goto start;
+    }
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
@@ -501,5 +521,37 @@ sys_pipe(void)
     fileclose(wf);
     return -1;
   }
+  return 0;
+}
+
+uint64 sys_symlink(void) {
+  char target[MAXPATH];
+  char path[MAXPATH];
+  struct inode *ip;
+  int n;
+
+  if ((n = argstr(0, target, MAXPATH)) < 0)
+    return -1;
+  if ((n = argstr(1, path, MAXPATH)) < 0)
+    return -1;
+
+  begin_op();
+
+  ip = create(path, T_SYMLINK, 0, 0);
+  if (ip == 0) {
+    end_op();
+    return -1;
+  }
+  int len = strlen(target);
+  ip->size = len;
+  if ((n = writei(ip, 0, (uint64)target, 0, len + 1)) != len + 1) {
+    iunlockput(ip);
+    end_op();
+    return -1;
+  }
+  iunlockput(ip);
+
+  end_op();
+
   return 0;
 }
