@@ -1,3 +1,6 @@
+#ifndef USER_H
+#define USER_H
+
 #ifdef LAB_MMAP
 typedef unsigned long size_t;
 typedef long int off_t;
@@ -53,4 +56,6 @@ int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
 #ifdef LAB_LOCK
 int statistics(void*, int);
+#endif
+
 #endif
