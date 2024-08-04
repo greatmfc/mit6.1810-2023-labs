@@ -1,6 +1,7 @@
 #ifndef PROC_H
 #define PROC_H
-
+#include "types.h"
+#include "param.h"
 // Saved registers for kernel context switches.
 struct context {
   uint64 ra;
@@ -82,7 +83,22 @@ struct trapframe {
   /* 280 */ uint64 t6;
 };
 
-enum procstate { UNUSED, USED, SLEEPING, RUNNABLE, RUNNING, ZOMBIE };
+struct mmap_info {
+  struct file *file_pointer;
+  uint64 length;
+  int protection_bits;
+  int sync_to_file;
+  uint64 addrs[16];
+};
+
+enum procstate {
+  UNUSED,
+  USED,
+  SLEEPING,
+  RUNNABLE,
+  RUNNING,
+  ZOMBIE
+};
 
 // Per-process state
 struct proc {
@@ -107,6 +123,8 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  struct mmap_info vma;
 };
 
 #endif

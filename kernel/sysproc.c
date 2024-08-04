@@ -91,3 +91,27 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+uint64 sys_mmap(void) {
+  uint64 addr, length, offset;
+  int prot, flags, fd;
+
+  argaddr(0, &addr);
+  argaddr(1, &length);
+  argaddr(5, &offset);
+
+  argint(2, &prot);
+  argint(3, &flags);
+  argint(4, &fd);
+
+  return kmmap(addr, length, prot, flags, fd, offset);
+}
+
+uint64 sys_munmap(void) {
+  uint64 addr, length;
+
+  argaddr(0, &addr);
+  argaddr(1, &length);
+
+  return kmunmap(addr, length);
+}
