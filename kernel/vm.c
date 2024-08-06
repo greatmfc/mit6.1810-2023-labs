@@ -506,6 +506,7 @@ int kmunmap(uint64 addr, size_t length) {
   int ret = 0;
   struct proc *p = myproc();
   struct mmap_info *vma = 0;
+  uint64 pa = walkaddr(p->pagetable, aligned_addr);
 
   for (int i = 0; i < 16; ++i) {
     for (count = 0; count < 16; ++count) {
@@ -523,8 +524,12 @@ int kmunmap(uint64 addr, size_t length) {
   }
 
   struct file *f = vma->file_pointer;
+  int do_free = 1;
+  if (pa == FAKE_MAP) {
+    do_free = 0;
+  }
 
-  if (vma->sync_to_file & MAP_SHARED) {
+  if ((vma->sync_to_file & MAP_SHARED) && (do_free)) {
     int r = 0, i = 0;
     int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
     while (i < n) {
@@ -546,10 +551,6 @@ int kmunmap(uint64 addr, size_t length) {
       i += r;
     }
     ret = (i == n ? n : -1);
-  }
-  int do_free = 1;
-  if (walkaddr(p->pagetable, aligned_addr) == FAKE_MAP) {
-    do_free = 0;
   }
   uvmunmap(p->pagetable, aligned_addr, npages, do_free);
   while (npages > 0) {

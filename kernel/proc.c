@@ -383,12 +383,7 @@ exit(int status)
       uint64 *addrs = p->vmas[i].addrs;
       for (int i = 0; i < 16; ++i) {
         if (addrs[i] != 0) {
-          int do_free = 1;
-          if (walkaddr(p->pagetable, addrs[i]) == FAKE_MAP) {
-            do_free = 0;
-          }
-          uvmunmap(p->pagetable, addrs[i], 1, do_free);
-          p->sz -= PGSIZE;
+          kmunmap(addrs[i], PGSIZE);
         }
       }
     }
