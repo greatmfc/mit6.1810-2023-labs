@@ -124,7 +124,8 @@ struct proc {
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
 
-  struct mmap_info vma;
+  struct mmap_info vmas[16];
+  int used_vma;
 };
 
 #endif

@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
 
 struct cpu cpus[NCPU];
 
@@ -146,6 +147,9 @@ found:
   p->context.ra = (uint64)forkret;
   p->context.sp = p->kstack + PGSIZE;
 
+  memset(p->vmas, 0, sizeof(struct mmap_info) * 16);
+  p->used_vma = 0;
+
   return p;
 }
 
@@ -282,6 +286,7 @@ fork(void)
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
+  struct mmap_info *cur_vma;
 
   // Allocate process.
   if((np = allocproc()) == 0){
@@ -311,6 +316,14 @@ fork(void)
   safestrcpy(np->name, p->name, sizeof(p->name));
 
   pid = np->pid;
+
+  for (int i = 0; i < 16; ++i) {
+    cur_vma = &np->vmas[i];
+    if (p->vmas[i].length != 0) {
+      memmove(cur_vma, &p->vmas[i], sizeof(struct mmap_info));
+      filedup(cur_vma->file_pointer);
+    }
+  }
 
   release(&np->lock);
 
@@ -364,6 +377,22 @@ exit(int status)
   iput(p->cwd);
   end_op();
   p->cwd = 0;
+
+  for (int i = 0; i < 16; ++i) {
+    if (p->vmas[i].length != 0) {
+      uint64 *addrs = p->vmas[i].addrs;
+      for (int i = 0; i < 16; ++i) {
+        if (addrs[i] != 0) {
+          int do_free = 1;
+          if (walkaddr(p->pagetable, addrs[i]) == FAKE_MAP) {
+            do_free = 0;
+          }
+          uvmunmap(p->pagetable, addrs[i], 1, do_free);
+          p->sz -= PGSIZE;
+        }
+      }
+    }
+  }
 
   acquire(&wait_lock);
 

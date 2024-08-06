@@ -5,6 +5,11 @@
 #include "riscv.h"
 #include "defs.h"
 #include "fs.h"
+#include "spinlock.h"
+#include "fcntl.h"
+#include "file.h"
+#include "sleeplock.h"
+#include "proc.h"
 
 /*
  * the kernel's page table.
@@ -324,6 +329,10 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
       panic("uvmcopy: page not present");
     pa = PTE2PA(*pte);
     flags = PTE_FLAGS(*pte);
+    if (flags & PTE_M) {
+      mappages(new, i, PGSIZE, FAKE_MAP, flags);
+      continue;
+    }
     if((mem = kalloc()) == 0)
       goto err;
     memmove(mem, (char*)pa, PGSIZE);
@@ -448,4 +457,113 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   } else {
     return -1;
   }
+}
+
+uint64
+kmmap(uint64 addr, size_t length, int prot, int flags, int fd, off_t offset) {
+  struct proc *p = myproc();
+  uint64 start_map_addr = PGROUNDUP(p->sz);
+  struct mmap_info *cur_vma = &p->vmas[p->used_vma];
+  cur_vma->file_pointer = p->ofile[fd];
+
+  if ((cur_vma->file_pointer->readable == 0) && (prot & PROT_READ)) {
+    goto bad;
+  }
+  if ((cur_vma->file_pointer->writable == 0) && (prot & PROT_WRITE)) {
+    if (!(flags & MAP_PRIVATE))
+      goto bad;
+  }
+  cur_vma->protection_bits = prot;
+  cur_vma->sync_to_file = flags;
+  filedup(cur_vma->file_pointer);
+  int count = 0;
+  size_t lg = PGROUNDUP(length);
+  while (lg != 0) {
+    if (count >= 16) {
+      goto bad;
+    }
+    cur_vma->addrs[count] = start_map_addr + count * PGSIZE;
+    mappages(
+        p->pagetable, cur_vma->addrs[count], PGSIZE, FAKE_MAP, PTE_U | PTE_M);
+    lg -= PGSIZE;
+    ++count;
+  }
+  cur_vma->length = length;
+  p->sz += PGROUNDUP(length);
+  p->used_vma++;
+  return start_map_addr;
+
+bad:
+  memset(cur_vma, 0, sizeof(struct mmap_info));
+  return -1;
+}
+
+int kmunmap(uint64 addr, size_t length) {
+  uint64 aligned_addr = PGROUNDDOWN(addr);
+  int count = 0;
+  int n = PGROUNDUP(length);
+  int npages = n / PGSIZE;
+  int ret = 0;
+  struct proc *p = myproc();
+  struct mmap_info *vma = 0;
+
+  for (int i = 0; i < 16; ++i) {
+    for (count = 0; count < 16; ++count) {
+      if (aligned_addr == p->vmas[i].addrs[count]) {
+        vma = &p->vmas[i];
+        break;
+      }
+    }
+    if (vma != 0) {
+      break;
+    }
+  }
+  if (count == 16 || vma == 0) {
+    return -1;
+  }
+
+  struct file *f = vma->file_pointer;
+
+  if (vma->sync_to_file & MAP_SHARED) {
+    int r = 0, i = 0;
+    int max = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
+    while (i < n) {
+      int n1 = n - i;
+      if (n1 > max)
+        n1 = max;
+
+      begin_op();
+      ilock(f->ip);
+      if ((r = writei(f->ip, 1, aligned_addr + i, f->off, n1)) > 0)
+        f->off += r;
+      iunlock(f->ip);
+      end_op();
+
+      if (r != n1) {
+        // error from writei
+        break;
+      }
+      i += r;
+    }
+    ret = (i == n ? n : -1);
+  }
+  int do_free = 1;
+  if (walkaddr(p->pagetable, aligned_addr) == FAKE_MAP) {
+    do_free = 0;
+  }
+  uvmunmap(p->pagetable, aligned_addr, npages, do_free);
+  while (npages > 0) {
+    vma->addrs[count++] = 0;
+    --npages;
+  }
+  p->sz -= n;
+  if (vma->length > length) {
+    vma->length -= length;
+  }
+  else {
+    vma->length = 0;
+    fileclose(vma->file_pointer);
+    p->used_vma--;
+  }
+  return ret;
 }

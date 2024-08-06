@@ -5,6 +5,8 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
+#include "file.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -15,6 +17,8 @@ extern char trampoline[], uservec[], userret[];
 void kernelvec();
 
 extern int devintr();
+
+int handle_mmap(struct proc *, uint64);
 
 void
 trapinit(void)
@@ -68,9 +72,21 @@ usertrap(void)
   } else if((which_dev = devintr()) != 0){
     // ok
   } else {
-    printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
-    printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
-    setkilled(p);
+    int res = -1;
+    uint64 trap_addr = r_stval();
+    if (trap_addr < MAXVA) {
+      pte_t *pte = walk(p->pagetable, trap_addr, 0);
+      if (pte != 0) {
+        if (PTE_FLAGS(*pte) & PTE_M) {
+          res = handle_mmap(p, trap_addr);
+        }
+      }
+    }
+    if (res) {
+      printf("usertrap(): unexpected scause %p pid=%d\n", r_scause(), p->pid);
+      printf("            sepc=%p stval=%p\n", r_sepc(), r_stval());
+      setkilled(p);
+    }
   }
 
   if(killed(p))
@@ -219,3 +235,70 @@ devintr()
   }
 }
 
+int handle_mmap(struct proc *p, uint64 stval) {
+  int count = 0;
+  int pte_bits = 0;
+  int n;
+  struct mmap_info *cur_vma = 0;
+  uint64 aligned_addr = PGROUNDDOWN(stval);
+  pte_t *pte;
+
+  for (int i = 0; i < 16; ++i) {
+    for (count = 0; count < 16; ++count) {
+      if (aligned_addr == p->vmas[i].addrs[count]) {
+        cur_vma = &p->vmas[i];
+        break;
+      }
+    }
+    if (cur_vma != 0) {
+      break;
+    }
+  }
+
+  if (count >= 16 || cur_vma == 0) {
+    return -1;
+  }
+
+  if (cur_vma->protection_bits & PROT_READ) {
+    pte_bits |= PTE_R;
+  }
+  if (cur_vma->protection_bits & PROT_WRITE) {
+    pte_bits |= PTE_W;
+  }
+
+  struct inode *file_inode = cur_vma->file_pointer->ip;
+  begin_op();
+  ilock(file_inode);
+  int fz = file_inode->size;
+  off_t offset = count * PGSIZE;
+  int bytes_to_read = fz - offset;
+  bytes_to_read = bytes_to_read > PGSIZE ? PGSIZE : bytes_to_read;
+  while (offset < fz) {
+    uint64 pa = (uint64)kalloc();
+    memset((void *)pa, 0, PGSIZE);
+    pte = walk(p->pagetable, cur_vma->addrs[count], 0);
+    *pte = PA2PTE(pa) | pte_bits | ((PTE_FLAGS(*pte) & (~PTE_M)));
+    if ((n = readi(file_inode, 0, pa, offset, bytes_to_read)) !=
+        bytes_to_read) {
+      printf("Cannot read from file in mmap in process %d.\n", p->pid);
+      setkilled(p);
+      iunlock(file_inode);
+      end_op();
+      return -1;
+    }
+    ++count;
+    offset += bytes_to_read;
+    bytes_to_read = fz - offset;
+    bytes_to_read = bytes_to_read > PGSIZE ? PGSIZE : bytes_to_read;
+  }
+  iunlock(file_inode);
+  end_op();
+  while (cur_vma->addrs[count] != 0) {
+    uint64 pa = (uint64)kalloc();
+    memset((void *)pa, 0, PGSIZE);
+    pte = walk(p->pagetable, cur_vma->addrs[count], 0);
+    *pte = PA2PTE(pa) | pte_bits | ((PTE_FLAGS(*pte) & (~PTE_M)));
+    ++count;
+  }
+  return 0;
+}
